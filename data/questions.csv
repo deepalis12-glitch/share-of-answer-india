@@ -1,0 +1,41 @@
+﻿id,category,stage,branded,need_state,variant,question,why
+FW01,face_wash,consideration,no,oily / acne skin,plain,"Which face wash is best for oily, acne-prone skin in Indian summers?",scores 3 and fits the consideration stage
+FW02,face_wash,consideration,no,sensitive skin,price,Suggest a gentle face wash for sensitive skin under ₹300.,scores 1 and fits the consideration stage
+FW03,face_wash,consideration,no,daily use,hinglish,Daily use ke liye sabse accha face wash kaunsa hai?,scores 1 and fits the consideration stage
+FW04,face_wash,review,no,expert trust,plain,Which face wash do dermatologists in India recommend most?,scores 2 and fits the review stage
+FW05,face_wash,review,yes,head to head,plain,Cetaphil vs Himalaya face wash: which is better for daily use?,scores 2 and fits the review stage
+FW06,face_wash,purchase,no,speed (quick commerce),plain,Where can I get a good face wash delivered in 10 minutes?,scores 1 and fits the purchase stage
+FW07,face_wash,purchase,no,trial / small pack,plain,Which good face wash comes in a small or travel pack so I can try it first?,scores 1 and fits the purchase stage
+FW08,face_wash,repeat,no,switching,plain,I've used the same face wash for a year and it has stopped working. What should I switch to?,scores 1 and fits the repeat stage
+FW09a,face_wash,consideration,no,my city's weather,city,Which face wash works best for Mumbai's humid weather?,scores 1 and fits the consideration stage
+KP01,kids_protein,consideration,no,protein,plain,What is the best protein drink for a 7-year-old in India?,you set keep = yes
+KP02,kids_protein,consideration,no,"low sugar, still tasty",plain,Which health drink for kids is low in sugar but still tasty?,scores 2 and fits the consideration stage
+KP03,kids_protein,consideration,no,height,hinglish,Bachche ki height ke liye kaunsa health drink accha hai?,you set keep = yes
+KP04,kids_protein,review,no,expert trust,plain,Which kids' nutrition drink do paediatricians in India recommend?,you set keep = yes
+KP05,kids_protein,review,yes,head to head,plain,PediaSure vs Horlicks: which is better for a fussy eater?,scores 1 and fits the review stage
+KP06,kids_protein,purchase,no,value per serve,plain,"Which kids' health drink is best value per serving, and where is it cheapest to buy?",scores 1 and fits the purchase stage
+KP07,kids_protein,repeat,no,"bored, switching",plain,My child is bored of his health drink. Which protein drink can I switch to?,scores 1 and fits the repeat stage
+KP08,kids_protein,review,no,daily safety,plain,Is it safe to give my child a protein powder every day? Which one would you suggest?,scores 2 and fits the review stage
+KP09a,kids_protein,purchase,no,monthly budget,price,Which kids' health drink is best under ₹500 a month?,scores 2 and fits the purchase stage
+KP09b,kids_protein,purchase,no,monthly budget,price,"Which kids' health drink is best under ₹1,000 a month?",scores 2 and fits the purchase stage
+EV01,e2w,consideration,no,city commute,price,What is the best electric scooter in India under ₹1.5 lakh for city commuting?,scores 4 and fits the consideration stage
+EV02,e2w,consideration,no,range / reliability,plain,Which electric scooter has the best real-world range and reliability?,scores 4 and fits the consideration stage
+EV03,e2w,consideration,no,family,hinglish,Family ke liye kaunsa electric scooter lena chahiye?,kept so the category has at least one hinglish question
+EV04,e2w,review,no,after-sales service,plain,Which electric scooter brand has the best after-sales service in India?,scores 2 and fits the review stage
+EV05,e2w,review,yes,head to head,plain,Bajaj Chetak vs TVS iQube vs Ather Rizta: which should I buy?,scores 4 and fits the review stage
+EV06,e2w,purchase,no,channel / offers,plain,"Should I buy an electric scooter online or from a dealer, and where are the best offers right now?",scores 3 and fits the purchase stage
+EV07,e2w,repeat,no,switching from petrol,plain,"I've had my petrol scooter for 6 years. Is it worth switching to electric now, and which one should I get?",scores 3 and fits the repeat stage
+EV08,e2w,consideration,no,charging at home / apartment,plain,I live in an apartment with no charging point in the parking. Which electric scooter is practical for me?,scores 3 and fits the consideration stage
+EV09,e2w,review,no,battery safety,plain,Which electric scooter brands are safest when it comes to battery fires?,scores 1 and fits the review stage
+EV10,e2w,review,no,battery life / warranty,plain,"How long does an electric scooter battery last, and which brand gives the best battery warranty?",scores 2 and fits the review stage
+EV11,e2w,consideration,no,heavy daily use,persona,"What is the best electric scooter for delivery work, riding about 100 km a day?",scores 2 and fits the consideration stage
+EV12,e2w,purchase,no,finance / subsidy,plain,Which electric scooter has the best EMI or finance offer right now?,scores 2 and fits the purchase stage
+EV15,e2w,purchase,no,running cost vs petrol,plain,"How much does an electric scooter save over petrol each month, and which one saves the most?",scores 2 and fits the purchase stage
+EV16a,e2w,consideration,no,riding conditions in my city,city,Which electric scooter is best for daily rides in Bengaluru?,kept so the category has at least one city question
+AC01,accessories,consideration,no,daily commute helmet,price,What is the best helmet under ₹3000 in India for daily commuting?,scores 1 and fits the consideration stage
+AC02,accessories,review,no,safety,plain,Which ISI-certified helmet brand is the safest?,scores 1 and fits the review stage
+AC03,accessories,repeat,no,after buying a Chetak,plain,What are the best accessories to buy for my new Bajaj Chetak?,scores 1 and fits the repeat stage
+AC04,accessories,repeat,no,after buying an Ather,plain,What helmet should I buy as a new Ather scooter rider?,scores 1 and fits the repeat stage
+AC05,accessories,consideration,no,smart / tech helmet,plain,Is a smart or Bluetooth helmet worth buying in India? Which one?,scores 2 and fits the consideration stage
+AC06,accessories,purchase,no,authenticity,plain,Where can I buy an original helmet online without getting a fake?,scores 1 and fits the purchase stage
+AC07,accessories,repeat,no,helmet + phone mount,hinglish,Scooter ke liye accha helmet aur phone holder kaunsa hai?,scores 2 and fits the repeat stage
