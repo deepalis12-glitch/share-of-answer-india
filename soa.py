@@ -28,7 +28,8 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
-OUT = ROOT / "results"
+RESULTS = ROOT / "results"   # question-building files live here; each month's run in results/YYYY-MM/
+OUT = RESULTS                # set per command in main()
 
 # Models: change here or with environment variables. Check each provider's docs for the current names.
 OPENAI_MODEL = os.environ.get("SOA_OPENAI_MODEL", "gpt-4.1")
@@ -50,7 +51,7 @@ STRENGTH_POINTS = {"pick": 3, "listed": 2, "passing": 1, "warned": 0}
 
 PICK_WORDS = re.compile(
     r"\b(best (overall|choice|pick|option)|top (pick|choice)|i('d| would) (recommend|go with|suggest)|"
-    r"go (for|with)|our pick|winner|stands out|highly recommend(ed)?|most (commonly )?recommended|most clinically[- ]backed|first choice|(reasonable|good|safe|smart) choice|sabse accha|best hai|pehli pasand|best (drink )?option)\b"
+    r"go (for|with)|our pick|winner|stands out|(top|final|my|our) recommendations?|best bet|best value|the better (option|choice)|highly recommend(ed)?|most (commonly )?recommended|most clinically[- ]backed|first choice|(reasonable|good|safe|smart) choice|sabse accha|best hai|pehli pasand|best (drink )?option)\b"
     r"|बेस्ट चॉइस|सबसे अच्छा|सबसे बेहतर|पहली पसंद",
     re.I,
 )
@@ -253,7 +254,8 @@ def cmd_run(args):
         if missing:
             sys.exit(f"Missing API keys: {', '.join(missing)}. Set them, or use --engines to skip one, "
                      f"or --dry-run to test.")
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
+    print(f"Wave {OUT.name}: answers go to {OUT}", flush=True)
     out_path = OUT / "answers.jsonl"
     done = set()
     if out_path.exists():  # resume: skip answers already saved
@@ -297,48 +299,52 @@ def cmd_run(args):
 
 # ---------- step 2: score ----------
 
+STRENGTH_RANK = {"pick": 3, "warned": 2, "listed": 1, "passing": 0}
+
+
+def judge_mention(answer, pos):
+    """How one mention of a brand reads: pick, warned, listed or passing."""
+    line_start = answer.rfind("\n", 0, pos) + 1
+    line_end = answer.find("\n", pos)
+    line = answer[line_start: line_end if line_end != -1 else len(answer)]
+    # Sentence = text between boundaries (. ? ! : and the Hindi danda), within the line.
+    before = [m.end() for m in SENT_END.finditer(answer, line_start, pos)]
+    sent_start = before[-1] if before else line_start
+    after = SENT_END.search(answer, pos)
+    sentence = answer[sent_start: after.end() if after else len(answer)]
+    # A label earlier on the same line counts too: "Best overall: X", "| Top pick | X |".
+    lead_in = answer[line_start:pos]
+    first_para_end = answer.find("\n")
+    in_opening = pos < (first_para_end if first_para_end != -1 else len(answer)) < 700
+    # Warning context = the rest of the brand's line, plus the next line when the brand's line is a short heading.
+    ctx_end = line_end if line_end != -1 else len(answer)
+    if ctx_end - line_start < 80 and line_end != -1 and "\t" not in line and "|" not in line:
+        nxt_end = answer.find("\n", line_end + 1)
+        nxt_end = nxt_end if nxt_end != -1 else len(answer)
+        if not LIST_LINE.search(answer[line_end + 1:nxt_end]):  # next line is body text, not another item
+            ctx_end = nxt_end
+    context = answer[sent_start:ctx_end]
+    picked = PICK_WORDS.search(sentence) or PICK_WORDS.search(lead_in) or in_opening
+    if WARN_WORDS.search(context) and not PICK_WORDS.search(sentence):
+        return "warned"
+    if picked:  # named in the opening summary = the answer's pick
+        return "pick"
+    if LIST_LINE.search(line):
+        return "listed"
+    return "passing"
+
+
 def find_mentions(answer, cat_brands):
-    """Return {brand: (first_position, strength)} for brands named in the answer."""
-    found = {}
-    for b in cat_brands:
-        pos = None
-        for alias in b["aliases"].split("|"):
-            m = re.search(r"(?<![\w])" + re.escape(alias.strip()) + r"(?![\w])", answer, re.I)
-            if m and (pos is None or m.start() < pos):
-                pos = m.start()
-        if pos is not None:
-            found[b["brand"]] = pos
-    if not found:
-        return {}
+    """Return {brand: (first_position, strength)}. Strength is the strongest of all the brand's mentions,
+    so a brand listed in a table and recommended at the end counts as the pick."""
     result = {}
-    for brand, pos in found.items():
-        line_start = answer.rfind("\n", 0, pos) + 1
-        line_end = answer.find("\n", pos)
-        line = answer[line_start: line_end if line_end != -1 else len(answer)]
-        # Sentence = text between boundaries (. ? ! and the Hindi danda), within the line.
-        before = [m.end() for m in SENT_END.finditer(answer, line_start, pos)]
-        sent_start = before[-1] if before else line_start
-        after = SENT_END.search(answer, pos)
-        sentence = answer[sent_start: after.end() if after else len(answer)]
-        first_para_end = answer.find("\n")
-        in_opening = pos < (first_para_end if first_para_end != -1 else len(answer)) < 700
-        # Warning context = the rest of the brand's line, plus the next line when the brand's line is a short heading.
-        ctx_end = line_end if line_end != -1 else len(answer)
-        if ctx_end - line_start < 80 and line_end != -1 and "\t" not in line and "|" not in line:
-            nxt_end = answer.find("\n", line_end + 1)
-            nxt_end = nxt_end if nxt_end != -1 else len(answer)
-            if not LIST_LINE.search(answer[line_end + 1:nxt_end]):  # next line is body text, not another item
-                ctx_end = nxt_end
-        context = answer[sent_start:ctx_end]
-        if WARN_WORDS.search(context) and not PICK_WORDS.search(sentence):
-            strength = "warned"
-        elif PICK_WORDS.search(sentence) or in_opening:  # named in the opening summary = the answer's pick
-            strength = "pick"
-        elif LIST_LINE.search(line):
-            strength = "listed"
-        else:
-            strength = "passing"
-        result[brand] = (pos, strength)
+    for b in cat_brands:
+        spots = sorted({m.start() for alias in b["aliases"].split("|") if alias.strip()
+                        for m in re.finditer(r"(?<![\w])" + re.escape(alias.strip()) + r"(?![\w])", answer, re.I)})
+        if not spots:
+            continue
+        strength = max((judge_mention(answer, p_) for p_ in spots), key=lambda s_: STRENGTH_RANK[s_])
+        result[b["brand"]] = (spots[0], strength)
     return result
 
 
@@ -588,7 +594,7 @@ def cmd_questions(args):
     cands = expand_bank(bank, variants)
     if args.category:
         cands = [c for c in cands if c["category"] == args.category]
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
 
     # Volume: manual file wins; otherwise automatic (Google answers are cached, so reruns are quick).
     manual = {}
@@ -776,6 +782,262 @@ def cmd_ideas(args):
     print(f"{len(rows)} things shoppers type about '{t}', saved to {path}")
 
 
+# ---------- between runs: what happened to each brand ----------
+
+EVENT_PROMPT = (
+    "List notable marketing or business events for the brand {brand} (owned by {owner}) in India between {since} "
+    "and {until}: ad campaigns, product launches or reformulations, price changes, offers, recalls, regulatory or "
+    "legal action, and major news coverage. Only events with a date in that window and a source you found. "
+    "Reply with only a JSON array of objects with keys date (YYYY-MM-DD), event (at most 15 words) and source_url. "
+    "If there were none, reply with []."
+)
+EVENT_FIELDS = ["date", "brand", "category", "event", "source"]
+
+
+def read_events():
+    path = DATA / "events.csv"
+    return read_csv(path) if path.exists() else []
+
+
+def cmd_events(args):
+    review = RESULTS / "events_review.csv"
+    if args.apply:
+        if not review.exists():
+            sys.exit("Nothing to apply yet. Run 'python soa.py events' first.")
+        have = read_events()
+        seen = {(e.get("date", ""), e.get("brand", ""), e.get("event", "").strip().lower()) for e in have}
+        added = 0
+        for r in read_csv(review):
+            if r.get("keep", "").strip().lower() == "no":
+                continue
+            k = (r["date"], r["brand"], r["event"].strip().lower())
+            if k not in seen:
+                have.append({f: r.get(f, "") for f in EVENT_FIELDS})
+                seen.add(k)
+                added += 1
+        have.sort(key=lambda e: (e.get("date", ""), e.get("brand", "")))
+        write_csv(DATA / "events.csv", have, EVENT_FIELDS)
+        print(f"Added {added} events to {DATA / 'events.csv'} ({len(have)} in total).")
+        return
+    if not os.environ.get("PERPLEXITY_API_KEY"):
+        sys.exit("Missing PERPLEXITY_API_KEY. Set it first (this step searches the web through Perplexity).")
+    found = waves()
+    since = args.since or (max(json.loads(l)["asked_at"][:10] for l in open(RESULTS / found[-1] / "answers.jsonl",
+                                                                          encoding="utf-8")) if found else None)
+    if not since:
+        sys.exit("No earlier run found. Give a start date: --since 2026-10-26")
+    until = args.until or datetime.now().strftime("%Y-%m-%d")
+    brands = [b for b in read_csv(DATA / "brands.csv")
+              if (args.all_brands or "seen in answers" not in b.get("role", ""))
+              and (not args.category or b["category"] == args.category)]
+    print(f"Looking for events from {since} to {until} for {len(brands)} brands...", flush=True)
+    rows = []
+    for b in brands:
+        q = EVENT_PROMPT.format(brand=b["brand"].replace(" (OEM)", ""), owner=b.get("owner", ""), since=since, until=until)
+        try:
+            text, cites = ask_perplexity(q)
+        except Exception as ex:
+            print(f"  {b['brand']}: could not search ({str(ex)[:100]})", flush=True)
+            continue
+        m = re.search(r"\[.*\]", text, re.S)
+        try:
+            items = json.loads(m.group(0)) if m else []
+        except ValueError:
+            items = []
+        kept = 0
+        for it in items if isinstance(items, list) else []:
+            d = str(it.get("date", ""))[:10]
+            url = str(it.get("source_url", ""))
+            if not (re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) and since <= d <= until and url.startswith("http")):
+                continue  # no date in the window, or no source: not kept
+            rows.append({"keep": "", "date": d, "brand": b["brand"], "category": b["category"],
+                         "event": str(it.get("event", "")).strip()[:200], "source": url})
+            kept += 1
+        print(f"  {b['brand']}: {kept} event(s)", flush=True)
+        time.sleep(args.pause)
+    rows.sort(key=lambda r: (r["category"], r["date"], r["brand"]))
+    write_csv(review, rows, ["keep"] + EVENT_FIELDS)
+    print(f"{len(rows)} events found. Check them in {review}: open each source, put 'no' in the keep column for any "
+          f"that are wrong or don't matter, then run 'python soa.py events --apply'.")
+
+
+# ---------- step 3: compare two months ----------
+
+BIG_MOVE, MOVE = 15, 8  # brand level, change in percentage points; smaller moves are within normal run-to-run noise
+QUESTION_MOVE = 34      # one question has only ~6 answers, so it takes 2+ answers changing to count
+
+
+def waves():
+    return sorted(d.name for d in RESULTS.iterdir() if d.is_dir() and re.fullmatch(r"\d{4}-\d{2}", d.name)
+                  and (d / "answers.jsonl").exists()) if RESULTS.exists() else []
+
+
+def load_wave(w):
+    path = RESULTS / w / "answers.jsonl"
+    if not path.exists():
+        sys.exit(f"No answers for wave {w} (looked for {path}). Waves found: {', '.join(waves()) or 'none'}")
+    return [json.loads(l) for l in open(path, encoding="utf-8")]
+
+
+def brand_sentence(answer, brand_row):
+    for alias in brand_row["aliases"].split("|"):
+        m = re.search(r"(?<![\w])" + re.escape(alias.strip()) + r"(?![\w])", answer, re.I)
+        if m:
+            a = max(answer.rfind(".", 0, m.start()), answer.rfind("\n", 0, m.start())) + 1
+            b = min([x for x in (answer.find(".", m.end()), answer.find("\n", m.end())) if x != -1] or [len(answer)])
+            return re.sub(r"\s+", " ", answer[a:b + 1]).strip()[:300]
+    return ""
+
+
+def cmd_compare(args):
+    found = waves()
+    if len(args.waves) >= 2:
+        a_w, b_w = args.waves[:2]
+    elif len(args.waves) == 1:
+        a_w, b_w = args.waves[0], (found[-1] if found else "")
+    else:
+        a_w, b_w = (found[-2], found[-1]) if len(found) >= 2 else ("", "")
+    if not a_w or not b_w or a_w == b_w:
+        sys.exit(f"Need two waves to compare. Waves found: {', '.join(found) or 'none'}")
+    A, B = load_wave(a_w), load_wave(b_w)
+    # Like for like: same questions, same engines, unbranded only.
+    common_q = {x["question_id"] for x in A} & {x["question_id"] for x in B}
+    common_e = {x["engine"] for x in A} & {x["engine"] for x in B}
+    A = [x for x in A if x["question_id"] in common_q and x["engine"] in common_e and x["branded"] == "no"]
+    B = [x for x in B if x["question_id"] in common_q and x["engine"] in common_e and x["branded"] == "no"]
+    brands = read_csv(DATA / "brands.csv")
+    need = {q["id"]: q.get("need_state", "") for q in read_csv(DATA / "questions.csv")}
+    by_cat = defaultdict(list)
+    for b in brands:
+        by_cat[b["category"]].append(b)
+    for x in A + B:
+        x["_m"] = find_mentions(x["answer"], by_cat[x["category"]])
+        x["_ch"] = {c for c, pat in CHANNELS.items() if re.search(pat, x["answer"], re.I)}
+        x["_dom"] = {d for d in (domain(c) if c.startswith("http") else c.lower() for c in x["citations"]) if d}
+
+    def stats(group, brand):
+        n = len(group) or 1
+        hits = [g["_m"][brand] for g in group if brand in g["_m"]]
+        return {"named": 100 * len(hits) / n, "pick": 100 * sum(1 for _, s_ in hits if s_ == "pick") / n,
+                "warned": 100 * sum(1 for _, s_ in hits if s_ == "warned") / n}
+
+    def label(d):
+        return "Big move" if abs(d) >= BIG_MOVE else "Move" if abs(d) >= MOVE else "Within noise"
+
+    tag = f"{a_w}_vs_{b_w}"
+    brand_rows, q_rows = [], []
+    for cat, cbs in by_cat.items():
+        ga, gb = [x for x in A if x["category"] == cat], [x for x in B if x["category"] == cat]
+        if not ga or not gb:
+            continue
+        for b in cbs:
+            sa, sb = stats(ga, b["brand"]), stats(gb, b["brand"])
+            if not (sa["named"] or sb["named"]):
+                continue
+            d = sb["named"] - sa["named"]
+            # Drivers: the questions where this brand moved most.
+            moves = []
+            for qid in sorted({x["question_id"] for x in ga}):
+                qa = [x for x in ga if x["question_id"] == qid]
+                qb = [x for x in gb if x["question_id"] == qid]
+                ta, tb = stats(qa, b["brand"]), stats(qb, b["brand"])
+                dq = tb["named"] - ta["named"]
+                if ta["named"] or tb["named"]:
+                    before = next((brand_sentence(x["answer"], b) for x in qa if b["brand"] in x["_m"]), "")
+                    after = next((brand_sentence(x["answer"], b) for x in qb if b["brand"] in x["_m"]), "")
+                    q_rows.append({"category": cat, "brand": b["brand"], "question_id": qid,
+                                   "need_state": need.get(qid, ""), "question": qa[0]["prompt"],
+                                   f"named_{a_w}_%": round(ta["named"], 1), f"named_{b_w}_%": round(tb["named"], 1),
+                                   "change_pts": round(dq, 1),
+                                   "read": "Big move" if abs(dq) >= QUESTION_MOVE else "Within noise",
+                                   f"what_AI_said_{a_w}": before, f"what_AI_said_{b_w}": after})
+                    moves.append((dq, qid))
+            moves.sort(key=lambda m: -abs(m[0]))
+            drivers = "; ".join(f"{q} {m:+.0f}" for m, q in moves[:3] if abs(m) >= MOVE)
+            brand_rows.append({"category": cat, "brand": b["brand"],
+                               f"named_{a_w}_%": round(sa["named"], 1), f"named_{b_w}_%": round(sb["named"], 1),
+                               "named_change_pts": round(d, 1),
+                               f"pick_{a_w}_%": round(sa["pick"], 1), f"pick_{b_w}_%": round(sb["pick"], 1),
+                               "pick_change_pts": round(sb["pick"] - sa["pick"], 1),
+                               "warned_change_pts": round(sb["warned"] - sa["warned"], 1),
+                               "read": label(d), "driven_by_questions": drivers})
+    brand_rows.sort(key=lambda r: (r["category"], -abs(r["named_change_pts"])))
+    q_rows.sort(key=lambda r: (r["category"], r["brand"], -abs(r["change_pts"])))
+
+    # Sources and channels gained or lost: the evidence for why.
+    src_rows, chan_rows = [], []
+    for cat in by_cat:
+        ga, gb = [x for x in A if x["category"] == cat], [x for x in B if x["category"] == cat]
+        if not ga or not gb:
+            continue
+        ca, cb = Counter(d for x in ga for d in x["_dom"]), Counter(d for x in gb for d in x["_dom"])
+        for d in set(ca) | set(cb):
+            pa, pb = 100 * ca[d] / len(ga), 100 * cb[d] / len(gb)
+            if abs(pb - pa) >= MOVE:
+                src_rows.append({"category": cat, "source": d, f"cited_{a_w}_%": round(pa, 1),
+                                 f"cited_{b_w}_%": round(pb, 1), "change_pts": round(pb - pa, 1),
+                                 "status": "new" if not ca[d] else "gone" if not cb[d] else "up" if pb > pa else "down"})
+        ka, kb = Counter(c for x in ga for c in x["_ch"]), Counter(c for x in gb for c in x["_ch"])
+        for c in set(ka) | set(kb):
+            pa, pb = 100 * ka[c] / len(ga), 100 * kb[c] / len(gb)
+            chan_rows.append({"category": cat, "channel": c, f"{a_w}_%": round(pa, 1), f"{b_w}_%": round(pb, 1),
+                              "change_pts": round(pb - pa, 1)})
+    src_rows.sort(key=lambda r: (r["category"], -abs(r["change_pts"])))
+    chan_rows.sort(key=lambda r: (r["category"], -abs(r["change_pts"])))
+
+    # Your log of what happened in between (campaigns, launches, price cuts, news).
+    events = []
+    if (DATA / "events.csv").exists():
+        start = min(x["asked_at"][:10] for x in A)
+        end = max(x["asked_at"][:10] for x in B)
+        events = [e for e in read_csv(DATA / "events.csv") if start <= e.get("date", "") <= end]
+
+    out = RESULTS / "compare"
+    write_csv(out / f"brands_{tag}.csv", brand_rows, list(brand_rows[0].keys()) if brand_rows else ["category"])
+    write_csv(out / f"questions_{tag}.csv", q_rows, list(q_rows[0].keys()) if q_rows else ["category"])
+    write_csv(out / f"sources_{tag}.csv", src_rows, list(src_rows[0].keys()) if src_rows else ["category"])
+    write_csv(out / f"channels_{tag}.csv", chan_rows, list(chan_rows[0].keys()) if chan_rows else ["category"])
+
+    lines = [f"# Share of Answer: {a_w} vs {b_w}", "",
+             f"Like for like: {len(common_q)} questions, engines {', '.join(sorted(common_e))}, "
+             f"{len(A)} vs {len(B)} unbranded answers. Moves of {BIG_MOVE}+ points are big; under {MOVE} is noise.", ""]
+    for cat in by_cat:
+        rows = [r for r in brand_rows if r["category"] == cat]
+        if not rows:
+            continue
+        lines += [f"## {cat}", ""]
+        moved = [r for r in rows if r["read"] != "Within noise"]
+        qmoved = [r for r in q_rows if r["category"] == cat and r["read"] == "Big move"]
+        if not moved and not qmoved:
+            lines.append("No brand moved beyond normal noise.")
+        for r in moved:
+            lines.append(f"- **{r['brand']}**: named {r[f'named_{a_w}_%']}% → {r[f'named_{b_w}_%']}% "
+                         f"({r['named_change_pts']:+} pts, {r['read'].lower()}); pick {r['pick_change_pts']:+} pts. "
+                         f"Driven by: {r['driven_by_questions'] or 'spread across questions'}.")
+        if qmoved:
+            lines += ["", "Big moves on single questions (a brand can win or lose one need state while its average holds):"]
+            for r in qmoved[:8]:
+                lines.append(f"- {r['brand']} on {r['question_id']} ({r['need_state']}): "
+                             f"{r[f'named_{a_w}_%']}% → {r[f'named_{b_w}_%']}% ({r['change_pts']:+} pts)")
+        srcs = [r for r in src_rows if r["category"] == cat][:5]
+        if srcs:
+            lines.append("")
+            lines.append("Sources AI leaned on differently: " + "; ".join(
+                f"{r['source']} ({r['status']}, {r['change_pts']:+} pts)" for r in srcs) + ".")
+        ev = [e for e in events if e.get("category", "") in ("", cat)]
+        if ev:
+            lines.append("")
+            lines.append("What happened in between: " + "; ".join(
+                f"{e['date']} {e.get('brand', '')}: {e.get('event', '')}" for e in ev) + ".")
+        lines.append("")
+    lines += ["The script shows what moved and the evidence. Why it moved is your call: check the "
+              f"before/after quotes in questions_{tag}.csv, the sources, and your events log."]
+    (out / f"summary_{tag}.md").write_text("\n".join(lines), encoding="utf-8")
+    print(f"Compared {a_w} with {b_w}. Read {out / f'summary_{tag}.md'} first; details in the CSVs beside it.")
+    for r in [r for r in brand_rows if r["read"] == "Big move"][:8]:
+        print(f"  {r['category']}: {r['brand']} {r['named_change_pts']:+} pts ({r['driven_by_questions']})")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -785,8 +1047,10 @@ def main():
     r.add_argument("--category", help="only one category, e.g. kids_protein")
     r.add_argument("--pause", type=float, default=1.0, help="seconds between calls")
     r.add_argument("--dry-run", action="store_true", help="fake answers, no keys needed")
+    r.add_argument("--wave", help="month label, default this month (e.g. 2026-11)")
     s = sub.add_parser("score", help="score saved answers into CSVs")
     s.add_argument("--include-branded", action="store_true", help="include head-to-head questions")
+    s.add_argument("--wave", help="which month to score, default the latest")
     qb = sub.add_parser("questions", help="pick the questions from data/question_bank.csv using the rules")
     qb.add_argument("--apply", action="store_true", help="write the kept questions to data/questions.csv")
     qb.add_argument("--category", help="only one category")
@@ -795,8 +1059,30 @@ def main():
     qb.add_argument("--max-per-stage", type=int, default=MAX_PER_STAGE)
     ib = sub.add_parser("ideas", help="see what shoppers type about a topic (Google autocomplete, India)")
     ib.add_argument("topic", help='e.g. "electric scooter"')
+    ev = sub.add_parser("events", help="find what happened to each brand since the last run (Perplexity web search)")
+    ev.add_argument("--apply", action="store_true", help="add the kept events to data/events.csv")
+    ev.add_argument("--since", help="start date, default the last run's date")
+    ev.add_argument("--until", help="end date, default today")
+    ev.add_argument("--category", help="only one category")
+    ev.add_argument("--all-brands", action="store_true", help="include brands added as 'seen in answers'")
+    ev.add_argument("--pause", type=float, default=1.0)
+    cp = sub.add_parser("compare", help="what changed between two months, and the evidence")
+    cp.add_argument("waves", nargs="*", help="e.g. 2026-10 2026-11; default the last two")
     a = p.parse_args()
-    {"run": cmd_run, "score": cmd_score, "questions": cmd_questions, "ideas": cmd_ideas}[a.cmd](a)
+    global OUT
+    if a.cmd == "run":
+        OUT = RESULTS / ("dry-run" if a.dry_run else (a.wave or datetime.now().strftime("%Y-%m")))
+    elif a.cmd == "score":
+        w = a.wave or (waves()[-1] if waves() else None)
+        if not w and (RESULTS / "answers.jsonl").exists():
+            OUT = RESULTS  # older single-run layout
+        elif not w:
+            sys.exit("No answers yet. Run 'python soa.py run' first.")
+        else:
+            OUT = RESULTS / w
+            print(f"Scoring wave {w}", flush=True)
+    {"run": cmd_run, "score": cmd_score, "questions": cmd_questions, "ideas": cmd_ideas,
+     "compare": cmd_compare, "events": cmd_events}[a.cmd](a)
 
 
 if __name__ == "__main__":

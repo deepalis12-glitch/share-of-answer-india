@@ -4,7 +4,7 @@ When shoppers ask ChatGPT, Gemini or Perplexity what to buy, which brands get na
 
 Working prototype, India only. **First results (26 Oct 2026) are in [FINDINGS.md](FINDINGS.md).** How the questions are chosen is in [METHOD.md](METHOD.md).
 
-Free to use and adapt (MIT licence).
+**For brand teams and small businesses:** a monthly read of what AI tells your shoppers, for about $10 in AI credits a run, less than one agency hour. Free to use and adapt (MIT licence).
 
 ## What it measures
 
@@ -51,9 +51,20 @@ You need Python 3.9 or later (Mac: already installed; type `python3 --version` i
    export PERPLEXITY_API_KEY=...
    ```
 3. Pick the questions (no keys needed): `python3 soa.py questions` scores every candidate in `data/question_bank.csv` and explains each decision in `results/question_review.csv`. Change anything you disagree with (see below), then `python3 soa.py questions --apply`.
-4. Test with fake answers first (no keys, no cost): `python3 soa.py run --dry-run && python3 soa.py score`, then delete the `results` folder.
+4. Test with fake answers first (no keys, no cost): `python3 soa.py run --dry-run && python3 soa.py score --wave dry-run`.
 5. Small real test: `python3 soa.py run --category kids_protein --runs 1`, then `python3 soa.py score`.
-6. Full run (each question x 3 engines x 3 runs): `python3 soa.py run`, then `python3 soa.py score`.
+6. Full run (each question x 3 engines x 3 runs): `python3 soa.py run`, then `python3 soa.py score`. Fake test answers go to `results/dry-run/`, so they never mix with real months.
+
+## Track it every month
+
+Run the same questions each month and compare. Keep `data/questions.csv` unchanged between months so the comparison is like for like.
+
+1. **Run** in the first week of the month: `python3 soa.py run`. Answers are saved under `results/YYYY-MM/` automatically (or set `--wave 2026-11`).
+2. **Score** it: `python3 soa.py score` (the latest month; `--wave 2026-10` for an earlier one).
+3. **Compare**: `python3 soa.py compare` (the last two months, or `compare 2026-10 2026-11`). Read `results/compare/summary_<month>_vs_<month>.md` first. The CSVs beside it hold each brand's change, the questions that drove it with what AI said before and after, sources AI cited more or less, and where it sent shoppers.
+4. **Log what happened** (optional, before the run): `python3 soa.py events` asks Perplexity, with web search, what happened to each tracked brand since the last run (campaigns, launches, price changes, recalls, news), each with a date and a source link, into `results/events_review.csv`. Open the sources, put `no` in the `keep` column for anything wrong or irrelevant, then `python3 soa.py events --apply` adds the rest to `data/events.csv`. You can also add lines by hand: `date,brand,category,event,source`. Events between the two runs appear in the compare summary, next to the moves.
+
+A brand's average moving 15+ points is a big move; under 8 is normal run-to-run noise. A single question has only about 6 answers, so it takes a 34+ point change to count. The script shows what moved and the evidence; why it moved is your judgement.
 
 ## Choosing the questions
 

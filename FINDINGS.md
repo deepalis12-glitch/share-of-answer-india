@@ -8,8 +8,8 @@ Run on 26 October 2026: 40 shopper questions chosen by the rules in [METHOD.md](
 
 | Category | Most named (share of answers) | What stands out |
 | --- | --- | --- |
-| Electric scooters | TVS iQube 85%, Ather 76%, Bajaj Chetak 65%, Ola S1 64%, Hero Vida 49% | iQube is the pick: recommended in 23% of answers, 46% on Perplexity. Chetak is named often but recommended in 3%, and is absent from the apartment-charging question. Ola is still named in 95% of ChatGPT answers despite a fall to about 6% of sales |
-| Kids' nutrition drinks | Horlicks 65%, PediaSure 44%, Complan 44%, Gritzo 26% | Horlicks is the pick on the low-sugar question (50%), so its No Added Sugar relaunch shows up in AI answers. It is absent on the protein question, which Gritzo and PediaSure take. Two in three answers question whether a child needs the drink at all |
+| Electric scooters | TVS iQube 85%, Ather 76%, Bajaj Chetak 65%, Ola S1 64%, Hero Vida 49% | iQube is the pick: recommended in 32% of answers, 46% on Perplexity. Chetak is named often but recommended in 6%, and is absent from the apartment-charging question. Ola is still named in 95% of ChatGPT answers, and recommended in 18%, despite a fall to about 6% of sales |
+| Kids' nutrition drinks | Horlicks 65%, PediaSure 44%, Complan 44%, Gritzo 26% | Horlicks is the pick on the low-sugar question (50%), so its No Added Sugar relaunch shows up in AI answers. It is absent on the protein question, where Gritzo is the pick in a third of answers. Two in three answers question whether a child needs the drink at all |
 | Face wash | Cetaphil 60%, Himalaya 21%, Mamaearth 17%, Pond's 6%, Garnier 2% | Dermatologist-led brands win: Cetaphil is named first in 54% of answers, and derm brands outside the tracked list (CeraVe, Minimalist, La Roche-Posay) appear often. Mass MNC brands are nearly invisible |
 | Two-wheeler accessories | Vega 54%, Steelbird 51%, Studds 49% | A bike brand's own accessories win only when the shopper names the bike: Chetak's own on "accessories for my new Chetak" (75%), Ather's Halo on the Ather helmet question (40%). On generic helmet or phone-holder questions they score 0% |
 
@@ -33,6 +33,7 @@ Run on 26 October 2026: 40 shopper questions chosen by the rules in [METHOD.md](
 
 ## Read with care
 
+- Scoring note: picks were rescored on 28 October so that a brand counts as the pick if any mention recommends it, not only its first mention. ChatGPT tends to list brands first and recommend at the end, so its picks had been undercounted.
 - Two engines, not three. Gemini returned "high demand" or timed out all afternoon on 26 October.
 - ChatGPT has 14 of 21 accessory answers (its credit ran out).
 - The warning rule was tuned on kids' sugar warnings, so it misses negative scooter mentions (Ola shows no warnings).
