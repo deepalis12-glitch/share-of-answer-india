@@ -1,0 +1,7 @@
+   .env
+   *.env
+   keys.txt
+   results/
+   data/signals/
+   data/questions_backup_*.csv
+   __pycache__/
